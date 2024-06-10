@@ -1,0 +1,138 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Apr 26 12:18:38 2024
+
+@author: alexf
+"""
+
+from Bio import SeqIO
+import numpy
+import matplotlib.pyplot as plt
+import pandas as pd
+
+
+def detect_mutation(ref_seq, mut_seq, pair_nuc_matrix):
+    """
+    Detect mutation in the mutated sequence
+    :param ref_seq: reference sequence
+    :param mut_seq: mutated sequence
+    :param pair_nuc_matrix: pairwise nucleotide matrix
+    :return: pair_nuc_matrix, mutation_array, deletion_array
+    pair_nuc_matrix: each element in this matrix corresponds to the counts of the nu
+    """
+    dict_seq_num = {"A": 0, "C": 1, "G": 2, "T": 3, "-": 4, "N": 5}
+    mutation_array = numpy.zeros(len(ref_seq))
+    deletion_array = numpy.zeros(len(ref_seq))
+    for pos in range(len(ref_seq)):
+        index_ref = dict_seq_num[ref_seq[pos]]
+        index_mut = dict_seq_num[mut_seq[pos]]
+        pair_nuc_matrix[index_ref, index_mut] += 1
+        if (index_ref != index_mut) and (index_mut < 4):
+            mutation_array[pos] = 1
+        if (index_ref != index_mut) and (index_mut == 4):
+            deletion_array[pos] = 1
+    return pair_nuc_matrix, mutation_array, deletion_array
+
+
+def plot_mutation_distribution(mutation_array, output_prefix):
+    """
+    Plot the distribution of mutations along the sequence
+    :param mutation_array: an array that stores the number of mutations per site
+    :param output_prefix: output prefix
+    :return:
+    """
+    fig, ax = plt.subplots()
+
+    x = 0.5 + numpy.arange(len(mutation_array))
+    ax.bar(x, mutation_array, width=1, color='blue')
+    plt.xlabel('Position', size=12)
+    plt.ylabel("Counts", size=12)
+    title = (str(output_prefix))
+    plt.title(title)
+
+    fig.savefig(output_prefix, dpi=200, transparent=True)
+
+
+def main():
+    """
+    The seq_matrix counts the occurrence of nucleotide pairs in the pairwise alignment between a reference sequence and
+    a mutated sequence in the following format:
+        A    C    G    T    -    N
+    A
+    C
+    G
+    T
+    -
+    N
+    """
+    seq_matrix = numpy.zeros((6, 6))
+
+    sequences = list(SeqIO.parse('C:/Users/alexf/Dropbox (UMass Medical School)/Alejandro Felix Mejia files/UMass/Python_code/In vitro evolution/Plate_sequencing/ALEJANDROFELIX_MEJIA05-31-2024_164529_272/Azo1_0_trimmed.fasta'
+, "fasta"))
+    reference_seq = sequences[0].seq
+    num_mutated_seq = len(sequences) - 1
+
+    # Empty arrays to start counting mutations and deletions
+    array_num_mutation = numpy.zeros((num_mutated_seq, len(reference_seq)))
+    array_num_deletion = numpy.zeros((num_mutated_seq, len(reference_seq)))
+
+    #
+    for i in range(1, len(sequences)):
+        mutated_seq = sequences[i].seq
+        seq_matrix, array_mutations, array_deletions = detect_mutation(reference_seq, mutated_seq, seq_matrix)
+        array_num_mutation[i - 1, :] = array_mutations
+        array_num_deletion[i - 1, :] = array_deletions
+
+    list_sum = numpy.sum(seq_matrix, axis=0)
+    total_counts = 0
+    for i in range(5):
+        total_counts += list_sum[i]
+    print("Total counts = %d" % total_counts)
+
+    mutation_counts_per_site = numpy.sum(array_num_mutation, axis=0)
+    plot_mutation_distribution(mutation_counts_per_site, "mutation_dist")
+
+    deletion_counts_per_site = numpy.sum(array_num_deletion, axis=0)
+    plot_mutation_distribution(deletion_counts_per_site, "deletion_dist")
+
+    total_mutations = numpy.sum(array_num_mutation)
+    print("There are %d mutations." % total_mutations)
+
+    total_deletions = numpy.sum(array_num_deletion)
+    print("There are %d deletions." % total_deletions)
+
+    mutation_freq_matrix = seq_matrix / total_counts
+
+    # To make the matrix results easier to visualize, we will turn them into Pandas dataframes and add the column and row titles
+    df1 = pd.DataFrame(seq_matrix)
+    df2 = pd.DataFrame(mutation_freq_matrix)
+
+    # Now to add titles to the rows and columns
+    title = ["A", "C", "G", "T", "-", "N"]
+
+    df1.columns = title
+    df1.index = title
+
+    df2.columns = title
+    df2.index = title
+
+    print("The seq_matrix is:")
+    print(df1)
+
+    print("The mutation-frequency matrix is:")
+    print(df2)
+
+    # Finally to qunatify the type of mutations, we first define the types of mutations
+    # We add the number of a specific kind of mutation divided by the total number of mutations
+    mut_type = {"Ts: A->G or T->C": round(((df1["G"]["A"] + df1["C"]["T"]) / total_mutations), 3),
+                "Ts: G->A or C->T": round(((df1["A"]["G"] + df1["T"]["C"]) / total_mutations), 3),
+                "Tv: A->T or T->A": round(((df1["T"]["A"] + df1["A"]["T"]) / total_mutations), 3),
+                "Tv: A->C or T->G": round(((df1["C"]["A"] + df1["G"]["T"]) / total_mutations), 3),
+                "Tv: G->C or C->G": round(((df1["C"]["G"] + df1["G"]["C"]) / total_mutations), 3),
+                "Tv: G->T or C->A": round(((df1["T"]["G"] + df1["A"]["C"]) / total_mutations), 3)}
+
+    print(mut_type)
+
+
+if __name__ == "__main__":
+    main()

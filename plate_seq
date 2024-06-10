@@ -1,0 +1,70 @@
+import matplotlib.pyplot as plt
+import numpy as np
+from Bio import SeqIO
+
+
+def count_mutations(seq1, seq2):
+    """Count the number of mutations between two sequences.
+    :param seq1 : Reference sequence
+    :param seq2 : Sequence to compare
+    """
+
+    mutations = 0
+    for base1, base2 in zip(seq1, seq2):
+        if base1 != base2:
+            mutations += 1
+    return mutations
+
+
+def visualize_mutations(fasta_file):
+    """Visualize the number of mutations in sequences from a FASTA file compared to the first sequence.
+    :param fasta_file : List of mutated sequences to compare to reference
+    """
+
+    sequences = []
+    mutation_counts = []
+
+    # Read sequences from the FASTA file
+    for record in SeqIO.parse(fasta_file, "fasta"):
+        sequences.append(str(record.seq))
+
+    # Set the first sequence as the reference sequence
+    target_sequence = sequences[0]
+
+    # Calculate mutation counts for each sequence (excluding the reference sequence)
+    for seq in sequences[1:]:
+        mutation_counts.append(count_mutations(target_sequence, seq))
+
+    # Calculate average and standard deviation
+    avg_mutations = np.mean(mutation_counts)
+    std_mutations = np.std(mutation_counts)
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(range(len(mutation_counts)), mutation_counts)
+    plt.xlabel('Sequence Index')
+    plt.ylabel('Number of Mutations')
+    plt.title('Number of Mutations in Sequences Compared to Reference')
+    plt.xticks(range(len(mutation_counts)))
+    plt.tight_layout()
+
+    # Save the graph as a JPEG image
+    plt.savefig('Azo_1_0 mutation per seq', dpi=200, transparent=True)
+
+    plt.show()
+
+    plt.hist(mutation_counts)
+    plt.xlabel('Number of mutations')
+    plt.ylabel('Number of plasmids')
+    plt.tight_layout()
+    plt.savefig('Azo_1_0 mut library mut number distribution', dpi=200, transparent=True)
+
+    plt.show()
+
+    print("Average number of mutations: {:.2f}".format(avg_mutations))
+    print("Standard deviation of mutations: {:.2f}".format(std_mutations))
+
+
+# Example usage
+fasta_file = '6_7_24_trimmed_reads.fasta'
+
+visualize_mutations(fasta_file)

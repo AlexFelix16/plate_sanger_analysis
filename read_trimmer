@@ -1,0 +1,89 @@
+from Bio import SeqIO
+from Bio.Seq import Seq
+
+def is_approx_match(seq, primer, max_mismatches=1):
+    """
+    Check if the sequence matches the primer with at most the given number of mismatches.
+
+    Args:
+        seq: The sequence to check.
+        primer: The primer sequence.
+        max_mismatches: The maximum allowed mismatches.
+
+    Returns:
+        bool: True if the sequence matches the primer with at most max_mismatches mismatches, False otherwise.
+    """
+    mismatches = sum(1 for a, b in zip(seq, primer) if a != b)
+    return mismatches <= max_mismatches
+
+def find_primer_position(sequence, primer, max_mismatches=1):
+    """
+    Find the position of the primer in the sequence allowing for mismatches.
+
+    Args:
+        sequence: The sequence to search in.
+        primer: The primer sequence.
+        max_mismatches: The maximum allowed mismatches.
+
+    Returns:
+        int: The position of the primer in the sequence, or -1 if not found.
+    """
+    primer_length = len(primer)
+    for i in range(len(sequence) - primer_length + 1):
+        if is_approx_match(sequence[i:i + primer_length], primer, max_mismatches):
+            return i
+    return -1
+
+def trim_sequences(input_fasta, output_fasta, primers, max_mismatches=1):
+    """
+    Trim sequences in a FASTA file based on forward and reverse primers and save the trimmed sequences to a new FASTA file.
+
+    Args:
+        input_fasta: Path to the input FASTA file.
+        output_fasta: Path to the output FASTA file.
+        primers: List of forward primers.
+        max_mismatches: The maximum allowed mismatches for primer matching.
+    """
+    # Create reverse primers as the reverse complement of the forward primers
+    rev_primers = [str(Seq(primer).reverse_complement()) for primer in primers]
+
+    # Read the input FASTA file
+    records = SeqIO.parse(input_fasta, "fasta")
+    trimmed_records = []
+
+    for record in records:
+        sequence = str(record.seq)
+
+        # Trim sequences based on forward primers
+        for forw_primer in primers:
+            pos = find_primer_position(sequence, forw_primer, max_mismatches)
+            if pos != -1:
+                sequence = sequence[pos:]
+                break  # Only trim by the first matching primer
+
+        # Trim sequences based on reverse primers
+        for rev_primer in rev_primers:
+            pos = find_primer_position(sequence, rev_primer, max_mismatches)
+            if pos != -1:
+                sequence = sequence[:pos + len(rev_primer)]
+                break  # Only trim by the first matching primer
+
+        # Check if the sequence starts with the second forward primer
+        if len(primers) > 1 and is_approx_match(sequence[:len(primers[1])], primers[1], max_mismatches):
+            sequence = str(Seq(sequence).reverse_complement())
+
+        # Update the record's sequence with the (potentially reverse-complemented) sequence
+        record.seq = Seq(sequence)
+        trimmed_records.append(record)
+
+    # Write the trimmed sequences to the output FASTA file
+    with open(output_fasta, "w") as output_handle:
+        SeqIO.write(trimmed_records, output_handle, "fasta")
+
+
+# Example usage
+primers = ["ATTTCGATGTGCCTTGCG", "CCGGTTTGTGTGACTTTC"] # The second primer is the reverse complement of the first reverse primer
+input_fasta = "6_7_24.fasta"
+output_fasta = "test.fasta"
+
+trim_sequences(input_fasta, output_fasta, primers, 3)

@@ -1,0 +1,20 @@
+from Bio import SeqIO
+
+def convert_to_uppercase(input_file, output_file):
+    # Parse the input fasta file
+    sequences = SeqIO.parse(input_file, "fasta")
+
+    # Convert sequences to uppercase
+    uppercase_sequences = []
+    for record in sequences:
+        record.seq = record.seq.upper()
+        uppercase_sequences.append(record)
+
+    # Write the uppercase sequences to the output fasta file
+    SeqIO.write(uppercase_sequences, output_file, "fasta")
+
+# Call the function to convert the sequences in "input.fasta" to uppercase and save them in "output.fasta"
+convert_to_uppercase("6_7_24_trimmed_aligned.fa", "6_7_24_trimmed_aligned_up.fasta")
+
+# Print a success message
+print("The sequences in input.fasta were successfully converted to uppercase and saved in output.fasta.")
